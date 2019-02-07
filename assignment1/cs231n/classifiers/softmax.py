@@ -31,50 +31,33 @@ def softmax_loss_naive(W, X, y, reg):
   #############################################################################
   scores = np.zeros((X.shape[0], W.shape[1]))
   for i in range(0, X.shape[0]):
+      scores[i, :] = X[i, :].dot(W) #1
+      scores[i, :] -= np.max(scores[i, :]) # for numerical stabilization
+      scores_exp = np.exp(scores[i, :]) #softmax num
+      sum_scores_exp = np.sum(scores_exp) #softmax denum
+      softmax = scores_exp / sum_scores_exp #2 This is softmax function
+      loss += -np.log(softmax[y[i]]) # this is loss
+      
       for j in range(0, W.shape[1]):
-          dot = np.sum(X[i, :]*(W[:, j])) #1 (1)
-          scores[i, j] = dot  #(1)
-      scores[i, :] -= np.max(scores[i, :]) #avoiding numerical stabilization
-      scores_exp = np.exp(scores[i, :]) #2 (1,10)
-      num = scores_exp #3 #numerator (1,10)
-      scores_sum = scores_exp.sum() #3 (1)
-      den = scores_sum #3 (1)
-      invden = 1 / den #3.5 #denumerator > (1) 
-      probs = num * invden #4 #sigmoid is done (1, 10) #broadcast
-      tclass_prob = probs[y[i]] #5 (1)
-      tclass_lprob = np.log(tclass_prob) #6 (1)
-      loss += -(tclass_lprob) #7 (1)
+          dW[:, j] += X[i]*(softmax[j] - (j == y[i])) 
+#       #derivative with chain rule
+#       dloss = 1
+#       dtclass_lprob = -1*dloss #7 # shape > 1
+#       dtclass_prob = (1/tclass_prob)*dtclass_lprob #6  # shape > 1
+      
+#       dprobs[i, y[i]] = 1*dtclass_prob
+#       dnum = invden*dprobs[i, :] #(1)
+#       dinvden = num*dprobs[i, :] #(1,10) #broadcast
     
-      #derivative with chain rule
-      dloss = 1
-      dtclass_lprob = -1*dloss #7 # shape > 1
-      dtclass_prob = 1/tclass_prob*dtclass_lprob #6  # shape > 1
+#       dden = (-1 / den**2)*dinvden #(1,10) #broadcast
+
+      
+#       dscores_exp = 1*dnum #(1)
+#       dscores_exp += W.shape[1]*dden #(1,10)broadcast
     
-      dnum = invden*dtclass_prob #(1)
-      dinvden = num*dtclass_prob #(1,10) #broadcast
-    
-      dden = (-1 / den**2)*dinvden #(1,10) #broadcast
-      dscores_sum = 1*dden #(1,10)
-      dscores_exp = 1*dnum #(1)
-      dscores_exp += dscores_exp*dscores_sum #(1,10)broadcast
-    
-      dscores = np.exp(scores[i, :])*dscores_exp #(1,10)
-      ddot = dscores #(1,10)
-      dW += X[i, :].reshape(-1,1).dot(dscores.reshape(1,-1)) # dscores > (1,10) dW > 3073x10
-    #ddot*X_dev[i, :]
-    
-    #ddot = ((1 - scores[i, y_dev[i]])*scores[i, y_dev[i]])*d_loss
-    #dW[:, y_dev[i]] += X_dev[i, :] * ddot
-      #scores[i, :] -= np.max(scores[i, :])
-      #scores[i, :] = np.exp(scores[i, :])
-      #scores[i, :] = scores[i, :] / scores[i, :].sum() #softmax
-      #loss += -np.log(scores[i, y[i]])
-      #d_loss = -1 / scores[i, y[i]]  
-      ##d_loss = -1 / scores[i, :] 
-      #ddot = ((1 - scores[i, y[i]])*scores[i, y[i]])*d_loss
-      ##ddot = ((1 - scores[i, :])*scores[i, :])*d_loss
-      #dW[:, y[i]] += X[i, :] * ddot
-      ##dW += X[i, :].reshape(W.shape[0],-1) * ddot.reshape(1, -1)
+#       ddot = scores[i, :]*dscores_exp #(1,10)
+#       dW += X[i, :].reshape(-1,1).dot(ddot.reshape(1,-1)) # dscores > (1,10) dW > 3073x10
+
   loss = loss / X.shape[0]
   loss += reg*np.sum(W*W)
   
@@ -105,13 +88,24 @@ def softmax_loss_vectorized(W, X, y, reg):
   #############################################################################
   N = X.shape[0]
   scores = X.dot(W)
-  #for numerical stability
-  scores -= np.max(scores, axis = 1).reshape(N, 1)
+  scores -= np.max(scores, axis = 1).reshape(N, 1) #for numerical stability
   exp = np.exp(scores)
-  probs = exp / exp.sum(axis=1).reshape(N, 1)
-  loss = np.sum(-np.log(probs[range(0,N), y])) / N  
+  softmax = exp / exp.sum(axis=1).reshape(N, 1)
+  true_class_probs = softmax[range(0, N), y]
+  losses = -np.log(true_class_probs)
+    
+  #total loss
+  loss = np.sum(losses) / N  
   # add regularization
   loss += reg*np.sum(W*W)
+  
+  #dW
+  gama = np.zeros(softmax.shape)
+  gama[range(0, N), y] = 1
+  dW = X.T.dot(softmax - gama)
+  dW = dW / X.shape[0]
+  dW += 2*reg*W 
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
