@@ -39,24 +39,7 @@ def softmax_loss_naive(W, X, y, reg):
       loss += -np.log(softmax[y[i]]) # this is loss
       
       for j in range(0, W.shape[1]):
-          dW[:, j] += X[i]*(softmax[j] - (j == y[i])) 
-#       #derivative with chain rule
-#       dloss = 1
-#       dtclass_lprob = -1*dloss #7 # shape > 1
-#       dtclass_prob = (1/tclass_prob)*dtclass_lprob #6  # shape > 1
-      
-#       dprobs[i, y[i]] = 1*dtclass_prob
-#       dnum = invden*dprobs[i, :] #(1)
-#       dinvden = num*dprobs[i, :] #(1,10) #broadcast
-    
-#       dden = (-1 / den**2)*dinvden #(1,10) #broadcast
-
-      
-#       dscores_exp = 1*dnum #(1)
-#       dscores_exp += W.shape[1]*dden #(1,10)broadcast
-    
-#       ddot = scores[i, :]*dscores_exp #(1,10)
-#       dW += X[i, :].reshape(-1,1).dot(ddot.reshape(1,-1)) # dscores > (1,10) dW > 3073x10
+          dW[:, j] += X[i]*(softmax[j] - (j == y[i]))
 
   loss = loss / X.shape[0]
   loss += reg*np.sum(W*W)
@@ -103,7 +86,7 @@ def softmax_loss_vectorized(W, X, y, reg):
   gama = np.zeros(softmax.shape)
   gama[range(0, N), y] = 1
   dW = X.T.dot(softmax - gama)
-  dW = dW / X.shape[0]
+  dW = dW / N
   dW += 2*reg*W 
 
   #############################################################################
