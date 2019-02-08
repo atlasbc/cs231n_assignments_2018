@@ -114,7 +114,24 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    gama = np.zeros(softmax.shape)
+    gama[range(0, N), y] = 1
+    grads['W2'] = relu.T.dot(softmax - gama) # this might be relu.T.dot(softmax - gama - b2) > don't think it would be though
+    grads['W2'] /= N
+    grads['W2'] += 2*reg*W2
+    
+    dscores = softmax - gama
+    grads['b2'] = np.sum(dscores, axis=0, keepdims=True)
+    grads['b2'] /= N
+    
+    drelu = dscores.dot(W2.T)
+    dfirst_layer = (first_layer > 0)*drelu
+    grads['b1'] = np.sum(dfirst_layer, axis=0, keepdims=True)
+    grads['b1'] /= N
+    grads['W1'] = X.T.dot(dfirst_layer)
+    grads['W1'] /= N
+    grads['W1'] += 2*reg*W1 
+    
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
