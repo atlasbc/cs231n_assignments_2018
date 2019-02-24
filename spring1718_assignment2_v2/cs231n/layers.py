@@ -55,11 +55,9 @@ def affine_backward(dout, cache):
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
     dw = x.reshape(x.shape[0], -1).T.dot(dout)
-    #dw /= dw.shape[0] #adding this transform error e-11 to 6.75
     dx = dout.dot(w.T)
     dx = dx.reshape(x.shape)
     db = dout.sum(axis = 0 )
-    #db /= dout.shape[0] #adding this transform error e-11 to 6.75
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
