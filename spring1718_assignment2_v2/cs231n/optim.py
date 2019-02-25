@@ -65,7 +65,9 @@ def sgd_momentum(w, dw, config=None):
     # TODO: Implement the momentum update formula. Store the updated value in #
     # the next_w variable. You should also use and update the velocity v.     #
     ###########################################################################
-    pass
+    v = config['momentum']*v - config['learning_rate']*dw
+    w += v
+    next_w = w
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -99,7 +101,9 @@ def rmsprop(w, dw, config=None):
     # in the next_w variable. Don't forget to update cache value stored in    #
     # config['cache'].                                                        #
     ###########################################################################
-    pass
+    config['cache'] = config['decay_rate']*config['cache'] + (1 - config['decay_rate'])*dw**2
+    w -= config['learning_rate']*dw /(np.sqrt(config['cache']) + config['epsilon'])
+    next_w = w
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -139,7 +143,13 @@ def adam(w, dw, config=None):
     # NOTE: In order to match the reference output, please modify t _before_  #
     # using it in any calculations.                                           #
     ###########################################################################
-    pass
+    config['t'] += 1
+    config['m'] = config['beta1']*config['m'] + (1 - config['beta1'])*dw
+    config['v'] = config['beta2']*config['v'] + (1 - config['beta2'])*dw**2
+    first_unbias = config['m'] / (1 - config['beta1']**config['t'])
+    second_unbias = config['v'] / (1 - config['beta2']**config['t'])
+    w -= config['learning_rate']*first_unbias / (np.sqrt(second_unbias) + config['epsilon'])
+    next_w = w
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
