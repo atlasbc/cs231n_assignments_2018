@@ -135,7 +135,7 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     Input:
     - x: Data of shape (N, D)
     - gamma: Scale parameter of shape (D,)
-    - beta: Shift paremeter of shape (D,)
+    - beta: Shift parameter of shape (D,)
     - bn_param: Dictionary with the following keys:
       - mode: 'train' or 'test'; required
       - eps: Constant for numeric stability
@@ -178,7 +178,18 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Referencing the original paper (https://arxiv.org/abs/1502.03167)   #
         # might prove to be helpful.                                          #
         #######################################################################
-        pass
+        sample_mean = np.mean(x, axis = 0)
+        sample_var = np.var(x, axis=0)
+        sample_std = np.sqrt(sample_var + eps)
+        x_batch = (x - sample_mean) / sample_std # batch normalization
+        out = gamma*x_batch + beta #add learnable mean and variance scaler
+        
+        cache = (x, sample_mean, sample_std, sample_var, gamma, x_batch, out)
+        
+        #running average
+        running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+        running_var = momentum * running_var + (1 - momentum) * sample_var
+      
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -189,7 +200,7 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # then scale and shift the normalized data using gamma and beta.      #
         # Store the result in the out variable.                               #
         #######################################################################
-        pass
+        out = (x - running_mean) / np.sqrt(running_var + eps)
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
@@ -227,7 +238,42 @@ def batchnorm_backward(dout, cache):
     # Referencing the original paper (https://arxiv.org/abs/1502.03167)       #
     # might prove to be helpful.                                              #
     ###########################################################################
-    pass
+    N, D = dout.shape
+    
+    x = cache[0]
+    sample_mean = cache[1]
+    sample_var = cache[2]
+    sample_std = cache[3]
+    gamma = cache[4]
+    x_batch = cache[5]
+    out = cache[6]
+    
+    nominator = x - sample_mean
+    denominator = -(1 / sample_std)
+    
+    dgamma_x = dout
+    dbatch = gamma * dgamma_x # Idk why we multiply by N. Investigate this
+    #out is equal to nominator*denominator
+    dnominator = denominator * dbatch
+    dinverse = nominator * dbatch
+    
+    dx = -1 * dnominator
+    de = -1 * dnominator #gradient of mean
+    
+    #sqrt is equal to variance
+    dsqrt = (-1 / sample_std**2) * dinverse
+    dvar = (1 / (2*sample_std)) * dsqrt
+    de += 2*sample_mean* -dvar
+    
+    dx += (1 / N) * de
+    
+    davg_sqr = -1 * dvar
+    dsqr = (1 / N) * davg_sqr
+    dx += 2 * x * dsqr
+    
+    dgamma = np.sum(x_batch * dout, axis = 0)
+    dbeta = 1 * np.sum(dout, axis = 0)
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
