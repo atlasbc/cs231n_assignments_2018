@@ -181,34 +181,35 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         sample_mean = np.mean(x, axis = 0)
         sample_var = np.var(x, axis=0)
         sample_std = np.sqrt(sample_var + eps)
-        x_batch = (x - sample_mean) / sample_std # batch normalization
         
         #1
         sample_mean = np.mean(x, axis = 0)
         
-        #2 centered x is also nominator
+        #2
+        nom = x - sample_mean
+        
+        #3
         x_centered = x - sample_mean
         
-        #3 
+        #4
         sample_var = np.mean(x_centered**2, axis=0)
         
-        #4 sample standard deviation is also denominator
+        #5 sample standard deviation is also denominator
         sample_std = np.sqrt(sample_var + eps)
         
-        #5
-        inv_den = 1 / sample_std
-        
         #6
-        x_batch = x_centered*inv_den
+        den = 1 / sample_std
         
         #7
+        x_batch = nom*den
+        
+        #8
         x_batch_rescaled = gamma*x_batch
         
-        #8 This is also yi
+        #9 This is also yi
         out = x_batch_rescaled + beta
         
-        cache = (x, sample_mean, sample_std, sample_var, gamma, x_batch, eps)
-        
+        cache = (x_centered, den, sample_std, sample_var, gamma, x_batch, eps)        
         #running average
         running_mean = momentum * running_mean + (1 - momentum) * sample_mean
         running_var = momentum * running_var + (1 - momentum) * sample_var
@@ -262,40 +263,45 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     N, D = dout.shape
-    
-    x = cache[0]
-    sample_mean = cache[1]
-    sample_var = cache[2]
-    sample_std = cache[3]
+
+    # cache = (x_centered, den, sample_std, sample_var, gamma, x_batch, eps)
+    x_centered = cache[0]
+    den = cache[1]
+    sample_std = cache[2]
+    sample_var = cache[3]
     gamma = cache[4]
     x_batch = cache[5]
     eps = cache[6]
     
-    nominator = x - sample_mean
-    denominator = (1 / np.sqrt(sample_var + eps))
+    #9 out = x_batch_rescaled + beta
+    dx_batch_rescaled = dout
     
-    dgamma_x = dout
-    dbatch = gamma * dgamma_x 
+    #8 x_batch_rescaled = gamma*x_batch
+    dx_batch = gamma*dx_batch_rescaled
     
-    #out is equal to nominator*denominator
-    dnominator = denominator * dbatch
-    dinverse = (nominator * dbatch).sum(axis = 0)
-    print(dinverse.shape)
-    dx = +1 * dnominator
-    de = -1 * denominator*dbatch.sum(axis = 0) #gradient of mean
+    #7 x_batch = nom*den
+    dnom = den*dx_batch
+    dden = np.sum(x_centered*dx_batch, axis = 0)
     
-    #sqrt is equal to variance
-    dvar = (-1/2)*(np.sqrt(sample_var + eps)**-3) * dinverse
-    dxmu_sqr = (1/N)*dvar
-    dxmu = 2*(x - sample_mean)*dxmu_sqr
-    print(dvar.shape)
-    print(dxmu_sqr.shape)
-    print(de.shape)
-    de += (-2*(x - sample_mean)).sum(axis=0)*dxmu_sqr #should this really be minus?
+    #6 den = 1 / sample_std
+    dsample_std = (-1 / sample_std**2)*dden
     
-    dx += (1 / N) * de
+    #4 sample_std = np.sqrt(sample_var + eps)
+    dsample_var = (1/2*(1/np.sqrt(sample_var + eps)))*dsample_std
     
-    dx += dxmu
+    #4 sample_var = np.mean(x_centered**2, axis=0)
+    dx_centered = ((2/N)*x_centered)*dsample_var
+    
+    #3 x_centered = x - sample_mean
+    dx = dx_centered
+    dsample_mean = -1*np.sum(dx_centered, axis = 0) #-1*np.sum(2*x_centered, axis = 0)*dsample_var
+    
+    #2 nom = x - sample_mean
+    dx += 1*dnom
+    dsample_mean += -1*dnom.sum(axis = 0) #-1*den*(dx_batch.sum(axis=0))
+    
+    #1 sample_mean = np.mean(x, axis = 0)
+    dx += (1/N)*dsample_mean
     
     dgamma = np.sum(x_batch * dout, axis = 0)
     dbeta = 1 * np.sum(dout, axis = 0)
