@@ -182,9 +182,32 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         sample_var = np.var(x, axis=0)
         sample_std = np.sqrt(sample_var + eps)
         x_batch = (x - sample_mean) / sample_std # batch normalization
-        out = gamma*x_batch + beta #add learnable mean and variance scaler
         
-        cache = (x, sample_mean, sample_std, sample_var, gamma, x_batch, out)
+        #1
+        sample_mean = np.mean(x, axis = 0)
+        
+        #2 centered x is also nominator
+        x_centered = x - sample_mean
+        
+        #3 
+        sample_var = np.mean(x_centered**2, axis=0)
+        
+        #4 sample standard deviation is also denominator
+        sample_std = np.sqrt(sample_var + eps)
+        
+        #5
+        inv_den = 1 / sample_std
+        
+        #6
+        x_batch = x_centered*inv_den
+        
+        #7
+        x_batch_rescaled = gamma*x_batch
+        
+        #8 This is also yi
+        out = x_batch_rescaled + beta
+        
+        cache = (x, sample_mean, sample_std, sample_var, gamma, x_batch, eps)
         
         #running average
         running_mean = momentum * running_mean + (1 - momentum) * sample_mean
@@ -246,30 +269,33 @@ def batchnorm_backward(dout, cache):
     sample_std = cache[3]
     gamma = cache[4]
     x_batch = cache[5]
-    out = cache[6]
+    eps = cache[6]
     
     nominator = x - sample_mean
-    denominator = -(1 / sample_std)
+    denominator = (1 / np.sqrt(sample_var + eps))
     
     dgamma_x = dout
-    dbatch = gamma * dgamma_x # Idk why we multiply by N. Investigate this
+    dbatch = gamma * dgamma_x 
+    
     #out is equal to nominator*denominator
     dnominator = denominator * dbatch
-    dinverse = nominator * dbatch
-    
-    dx = -1 * dnominator
-    de = -1 * dnominator #gradient of mean
+    dinverse = (nominator * dbatch).sum(axis = 0)
+    print(dinverse.shape)
+    dx = +1 * dnominator
+    de = -1 * denominator*dbatch.sum(axis = 0) #gradient of mean
     
     #sqrt is equal to variance
-    dsqrt = (-1 / sample_std**2) * dinverse
-    dvar = (1 / (2*sample_std)) * dsqrt
-    de += 2*sample_mean* -dvar
+    dvar = (-1/2)*(np.sqrt(sample_var + eps)**-3) * dinverse
+    dxmu_sqr = (1/N)*dvar
+    dxmu = 2*(x - sample_mean)*dxmu_sqr
+    print(dvar.shape)
+    print(dxmu_sqr.shape)
+    print(de.shape)
+    de += (-2*(x - sample_mean)).sum(axis=0)*dxmu_sqr #should this really be minus?
     
     dx += (1 / N) * de
     
-    davg_sqr = -1 * dvar
-    dsqr = (1 / N) * davg_sqr
-    dx += 2 * x * dsqr
+    dx += dxmu
     
     dgamma = np.sum(x_batch * dout, axis = 0)
     dbeta = 1 * np.sum(dout, axis = 0)
@@ -304,7 +330,14 @@ def batchnorm_backward_alt(dout, cache):
     # should be able to compute gradients with respect to the inputs in a     #
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
-    pass
+    N, D = dout.shape
+    
+    x = cache[0]
+    sample_mean = cache[1]
+    sample_var = cache[2]
+    sample_std = cache[3]
+    gamma = cache[4]
+    x_batch = cache[5]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
