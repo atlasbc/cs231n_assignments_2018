@@ -192,7 +192,7 @@ class FullyConnectedNet(object):
             self.params[f'b{i+1}'] = np.zeros(self.layers[i+1]) 
             
             #initialize batchnorm scale and shift parameters
-            if self.normalization == 'batchnorm' and  i < self.num_layers-1:
+            if self.normalization == 'batchnorm' or self.normalization == 'layernorm' and  i < self.num_layers-1:
                 self.params[f'gamma{i+1}'] = np.ones(self.layers[i+1])
                 self.params[f'beta{i+1}'] = np.zeros(self.layers[i+1])
         ############################################################################
@@ -271,6 +271,21 @@ class FullyConnectedNet(object):
                     out, cache = affine_bn_relu_forward(out, self.params[f'W{i}'], self.params[f'b{i}'],\
                                                         self.params[f'gamma{i}'], self.params[f'beta{i}'], self.bn_params[i-1])     
                     caches.append(cache)
+                    
+        elif self.normalization == 'layernorm':
+            caches = []
+            
+            #first layer
+            out, cache = affine_ln_relu_forward(X, self.params['W1'], self.params['b1'],\
+                                                self.params['gamma1'], self.params['beta1'], self.bn_params[0]) #check this again
+            caches.append(cache)
+
+            i = 1
+            if self.num_layers >= 3:
+                for i in range(2, self.num_layers):
+                    out, cache = affine_ln_relu_forward(out, self.params[f'W{i}'], self.params[f'b{i}'],\
+                                                        self.params[f'gamma{i}'], self.params[f'beta{i}'], self.bn_params[i-1]) #check     
+                    caches.append(cache)            
         
         else:    
             #first layer
@@ -331,6 +346,18 @@ class FullyConnectedNet(object):
                 drelu, grads[f'W{i}'], grads[f'b{i}'], grads[f'gamma{i}'], grads[f'beta{i}'] = affine_bn_relu_backward(drelu, caches[i-1])
                 grads[f'W{i}'] += self.reg*self.params[f'W{i}']               
         
+        #with layernorm
+        elif self.normalization == 'layernorm':
+            #compute gradients of last layer
+            drelu, grads[f'W{j}'], grads[f'b{j}'] = affine_backward(dscores, scores_cache)
+            #add regularization
+            grads[f'W{j}'] += self.reg*self.params[f'W{j}']
+
+            #gradients of remaining layers
+            for i in range(j-1, 0, -1): 
+                drelu, grads[f'W{i}'], grads[f'b{i}'], grads[f'gamma{i}'], grads[f'beta{i}'] = affine_ln_relu_backward(drelu, caches[i-1])
+                grads[f'W{i}'] += self.reg*self.params[f'W{i}']   
+                
         # without batchnorm
         else: 
             #compute gradients of last layer

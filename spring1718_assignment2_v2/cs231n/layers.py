@@ -178,9 +178,6 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Referencing the original paper (https://arxiv.org/abs/1502.03167)   #
         # might prove to be helpful.                                          #
         #######################################################################
-        sample_mean = np.mean(x, axis = 0)
-        sample_var = np.var(x, axis=0)
-        sample_std = np.sqrt(sample_var + eps)
         
         #1
         sample_mean = np.mean(x, axis = 0)
@@ -393,7 +390,34 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # transformations you could perform, that would enable you to copy over   #
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
-    pass
+    #1
+    sample_mean = np.mean(x, axis = 1, keepdims=True)
+
+    #2
+    nom = x - sample_mean
+
+    #3
+    x_centered = x - sample_mean
+
+    #4
+    sample_var = np.mean(x_centered**2, axis=1, keepdims=True)
+
+    #5 sample standard deviation is also denominator
+    sample_std = np.sqrt(sample_var + eps)
+
+    #6
+    den = 1 / sample_std
+
+    #7
+    x_layer = nom*den
+
+    #8
+    x_layer_rescaled = gamma*x_layer
+
+    #9 This is also yi
+    out = x_layer_rescaled + beta
+
+    cache = (x_centered, den, sample_std, sample_var, gamma, x_layer, eps)  
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -424,7 +448,23 @@ def layernorm_backward(dout, cache):
     # implementation of batch normalization. The hints to the forward pass    #
     # still apply!                                                            #
     ###########################################################################
-    pass
+    N, D = dout.shape
+    
+    # cache = (x_centered, den, sample_std, sample_var, gamma, x_layer, eps) 
+    x_centered = cache[0]
+    den = cache[1]
+    sample_std = cache[2]
+    sample_var = cache[3]
+    gamma = cache[4]
+    x_layer = cache[5]
+    eps = cache[6]
+    
+    dx_centered = (-1/D)*x_centered*(1/sample_std**3)*((x_centered*dout*gamma).sum(axis=1, keepdims=True))
+    dx = (1/sample_std)*gamma*dout - (1/D)*((1/sample_std)*gamma*dout).sum(axis=1, keepdims=True) \
+         - (1/D)*dx_centered.sum(axis=1, keepdims=True) + dx_centered
+    
+    dgamma = np.sum(x_layer * dout, axis = 0, keepdims=True)
+    dbeta = 1 * np.sum(dout, axis = 0, keepdims=True) 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
