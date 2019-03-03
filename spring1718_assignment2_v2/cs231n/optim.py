@@ -148,7 +148,7 @@ def adam(w, dw, config=None):
     config['v'] = config['beta2']*config['v'] + (1 - config['beta2'])*dw**2
     first_unbias = config['m'] / (1 - config['beta1']**config['t'])
     second_unbias = config['v'] / (1 - config['beta2']**config['t'])
-    w -= config['learning_rate']*first_unbias / (np.sqrt(second_unbias) + config['epsilon'])
+    w = w - config['learning_rate']*first_unbias / (np.sqrt(second_unbias) + config['epsilon'])
     next_w = w
     ###########################################################################
     #                             END OF YOUR CODE                            #
