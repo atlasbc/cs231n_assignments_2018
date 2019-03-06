@@ -588,7 +588,29 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    stride = conv_param['stride']    
+    pad = conv_param['pad']
+    npad = ((0, 0), (pad, pad), (pad, pad))
+    r = w.shape[2] #receptive filter
+    F, C, HH, WW = w.shape
+
+    activation_h = int(1 + (x.shape[2] + 2 * pad - w.shape[2]) / stride)
+    activation_w = int(1 + (x.shape[3] + 2 * pad - w.shape[3]) / stride)
+    out = np.zeros((x.shape[0], F, activation_h, activation_w) )    
+    image_number = 0
+    for image in x:
+        #image is a 4x4 image that consist of 3 channels
+        padded_image = np.pad(image[:, :, :], npad, mode = 'constant') # apply zero pad to each channel (3,4,4) > (3,4+pad,4+pad)
+        
+        s_h = 0
+        for i in range(0, activation_h): # activations over row
+            s_w = 0    
+            for j in range(0, activation_w): #activations over column
+                out[image_number, :, i, j] = ((padded_image[:, 0+s_h:r+s_h, 0+s_w:r+s_w]*\
+                                                          w[:, :, :, :]).reshape(F, -1)).sum(axis=1) + b
+                s_w += stride
+            s_h += stride   
+        image_number += 1     
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -613,7 +635,44 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    # out: Output data, of shape (N, F, H', W')
+
+    (x, w, b, conv_param) = cache
+    pad = conv_param['pad']
+    stride = conv_param['stride']
+    npad = ((0, 0), (pad, pad), (pad, pad))
+    N = x.shape[0]
+    r = w.shape[2] #receptive filter
+    F, C, HH, WW = w.shape
+    
+    _, _, activation_h, activation_w = dout.shape
+    
+    dx = np.zeros(x.shape)
+    dw = np.zeros(w.shape)
+    db = np.zeros(b.shape)
+        
+    image_number = 0
+    for image in x:
+        #image is a 4x4 image that consist of 3 channels
+        padded_image = np.pad(image[:, :, :], npad, mode = 'constant') # apply zero pad to each channel (3,4,4) > (3,4+pad,4+pad)
+        padded_dx = np.pad(dx[image_number, :, :, :], npad, mode = 'constant')
+        
+        s_h = 0
+        for i in range(0, activation_h): # activations over row
+            s_w = 0    
+            for j in range(0, activation_w): #activations over column
+                rel_act = dout[image_number, :, i, j] # related activation = shape (2 ,)
+                
+                #gradient of w with using broadcasting
+                dw[:, :, :, : ] += padded_image[:, 0+s_h:r+s_h, 0+s_w:r+s_w] *rel_act[:, np.newaxis, np.newaxis, np.newaxis]
+                #gradient of x with pad
+                padded_dx[:, 0+s_h:r+s_h, 0+s_w:r+s_w] += (w*rel_act[:, np.newaxis, np.newaxis, np.newaxis]).sum(axis=0)
+                
+                s_w += stride
+            s_h += stride
+        dx[image_number, :, :, :] = padded_dx[: , pad:-pad , pad:-pad]    
+        image_number += 1      
+    db = dout.sum(axis=(0, 2, 3))   
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -643,7 +702,27 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
-    pass
+    N, C, H, W = x.shape
+    p_h = pool_param['pool_height']
+    p_w = pool_param['pool_width']
+    stride = pool_param['stride']
+    out_h = int(1 + (H - p_h) / stride)
+    out_w = int(1 + (W - p_w) /stride)
+    r = p_h 
+    
+    out = np.zeros((N, C, out_h, out_w))
+    
+    for image_number in range(0, N):
+        #image is a 4x4 image that consists of 3 channels
+        
+        s_h = 0
+        for i in range(0, out_h): # activations over row
+            s_w = 0    
+            for j in range(0, out_w): #activations over column
+                out[image_number, :, i, j] = ((x[image_number, :, 0+s_h:r+s_h, 0+s_w:r+s_w]).reshape(C, -1)).max(axis=1)
+                s_w += stride
+            s_h += stride    
+        
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -666,7 +745,34 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
-    pass
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    p_h = pool_param['pool_height']
+    p_w = pool_param['pool_width']
+    stride = pool_param['stride']
+    out_h = int(1 + (H - p_h) / stride)
+    out_w = int(1 + (W - p_w) /stride)
+    r = p_h 
+    
+    # shape of dout is (N, C, out_h, out_w)
+    dx = np.zeros(x.shape)
+    
+    image_number = 0
+    for image in x:
+        #image is a 4x4 image that consist of 3 channels
+        
+        s_h = 0
+        for i in range(0, out_h): # activations over row
+            s_w = 0    
+            for j in range(0, out_w): #activations over column
+#                 out[image_number, :, i, j] = ((x[image_number, :, 0+s_h:r+s_h, 0+s_w:r+s_w]).reshape(C, -1)).max(axis=1)
+                #need to find i, j. each channel of x may have different i, j
+                # find maximum indices along channels
+                #max_indices = ...
+                dx[image_number, : , i, j] += dout[max_indices]  
+                s_w += stride
+            s_h += stride   
+        image_number += 1       
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
