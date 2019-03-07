@@ -757,22 +757,23 @@ def max_pool_backward_naive(dout, cache):
     # shape of dout is (N, C, out_h, out_w)
     dx = np.zeros(x.shape)
     
-    image_number = 0
-    for image in x:
+    for image_number in range(0, N):
         #image is a 4x4 image that consist of 3 channels
         
         s_h = 0
         for i in range(0, out_h): # activations over row
             s_w = 0    
             for j in range(0, out_w): #activations over column
-#                 out[image_number, :, i, j] = ((x[image_number, :, 0+s_h:r+s_h, 0+s_w:r+s_w]).reshape(C, -1)).max(axis=1)
-                #need to find i, j. each channel of x may have different i, j
-                # find maximum indices along channels
-                #max_indices = ...
-                dx[image_number, : , i, j] += dout[max_indices]  
+                #print(x[image_number, :, 0:2, 0:2])
+                related_section = x[image_number, :, 0+s_h:r+s_h, 0+s_w:r+s_w]
+                
+                f = 0
+                for channel in related_section:                
+                    m_i, m_j = np.unravel_index(channel.argmax(), channel.shape)
+                    dx[image_number, f, 0+s_h:r+s_h, 0+s_w:r+s_w][m_i, m_j] += dout[image_number, f, i, j]
+                    f += 1                
                 s_w += stride
-            s_h += stride   
-        image_number += 1       
+            s_h += stride        
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
