@@ -811,7 +811,12 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # vanilla version of batch normalization you implemented above.           #
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
-    pass
+    (N, C, H, W) = x.shape
+    out = np.zeros(x.shape)
+    x_transposed = np.transpose(x, (0, 2, 3, 1)) #make it (N, H, W, C) for stability
+    x_reshaped = x_transposed.reshape(N*H*W, C)
+    out_reshaped, cache = batchnorm_forward(x_reshaped, gamma, beta, bn_param)
+    out = np.transpose(out_reshaped.reshape(N, H, W, C), (0, 3, 1, 2)) # turn into original shape
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -841,7 +846,13 @@ def spatial_batchnorm_backward(dout, cache):
     # vanilla version of batch normalization you implemented above.           #
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
-    pass
+    (N, C, H, W) = dout.shape
+    
+    dout_transposed = np.transpose(dout, (0, 2, 3, 1)) #make it (N, H, W, C) for stability
+    dout_reshaped = dout_transposed.reshape(N*H*W, C)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout_reshaped, cache)
+    
+    dx = np.transpose(dx.reshape(N, H, W, C), (0, 3, 1, 2)) # turn into original shape
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -860,7 +871,7 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     - x: Input data of shape (N, C, H, W)
     - gamma: Scale parameter, of shape (C,)
     - beta: Shift parameter, of shape (C,)
-    - G: Integer mumber of groups to split into, should be a divisor of C
+    - G: Integer number of groups to split into, should be a divisor of C
     - gn_param: Dictionary with the following keys:
       - eps: Constant for numeric stability
 
@@ -877,7 +888,28 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # the bulk of the code is similar to both train-time batch normalization  #
     # and layer normalization!                                                # 
     ###########################################################################
-    pass
+    (N, C, H, W) = x.shape
+    out = np.zeros(x.shape)
+    g_indices = np.linspace(0, C, num=G+1, dtype=int)
+    g_unit = C // G
+    cache = []
+#     gamma = np.ones(C,)
+#     beta = np.zeros(C,)
+    gamma = gamma.reshape(gamma.shape[1],) 
+    beta = beta.reshape(beta.shape[1],)
+    for i in range(0, G):
+        rel_group = x[:, g_indices[i]:g_indices[i+1], :, :] 
+#         print(rel_group.shape)
+        rel_group_transposed = np.transpose(rel_group, (0, 2, 3, 1)) #make it (N, H, W, C) for stability
+        rel_group_reshaped = rel_group_transposed.reshape(N*H*W, g_unit)
+#         print(rel_group_reshaped.shape)
+#         print(beta.shape)
+        out_reshaped, g_cache = layernorm_forward(rel_group_reshaped, \
+                                gamma[g_indices[i]:g_indices[i+1]], beta[g_indices[i]:g_indices[i+1]], gn_param)
+#         print(out_reshaped.shape)
+        cache.append(g_cache)
+        out[:, g_indices[i]:g_indices[i+1], :, :] = np.transpose(out_reshaped.reshape(N, H, W, g_unit), (0, 3, 1, 2)) # turn into original shape
+    cache.append((G, g_unit, g_indices))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -903,7 +935,21 @@ def spatial_groupnorm_backward(dout, cache):
     # TODO: Implement the backward pass for spatial group normalization.      #
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
-    pass
+    (G, g_unit, g_indices) = cache[-1]
+    (N, C, H, W) = dout.shape
+    dgamma = np.ones(C,)
+    dbeta = np.zeros(C,)
+    dx = np.zeros(dout.shape)
+    
+    for i in range(0, G):
+        rel_dout = dout[:, g_indices[i]:g_indices[i+1], :, :]
+        rel_dout_transposed = np.transpose(rel_dout, (0, 2, 3, 1)) #make it (N, H, W, C) for stability
+        rel_dout_reshaped = rel_dout_transposed.reshape(N*H*W, g_unit)
+        rel_dx, rel_dgamma, rel_dbeta = layernorm_backward(rel_dout_reshaped, cache[i])
+
+        dx[:, g_indices[i]:g_indices[i+1], :, :] = np.transpose(rel_dx.reshape(N, H, W, g_unit), (0, 3, 1, 2)) # turn into original shape
+        dgamma[g_indices[i]:g_indices[i+1]] = rel_dgamma
+        dbeta[g_indices[i]:g_indices[i+1]] = rel_dbeta
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
