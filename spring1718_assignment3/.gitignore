@@ -3,4 +3,5 @@
 .env/*
 
 # gitignore the built release.
-assignment3/*
+spring1718_assignment3/*
+cs231n/datasets/coco_captioning
