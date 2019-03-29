@@ -155,34 +155,22 @@ def rnn_backward(dh, cache):
     D = cache[0][-1].shape[-1]
     
     dx = np.zeros((N, T, D))
-    dh0 = np.zeros((N, H))
-    dWx = np.zeros((D, H))
-    dWh = np.zeros((H, H))
-    db = np.zeros((H, ))
+    #dh0 = np.zeros((N, H))
+    #dWx = np.zeros((D, H))
+    #dWh = np.zeros((H, H))
+    #db = np.zeros((H, ))
     
     #last hidden state
-    dx[:, T-1, :], dprev_h, dWx_step, dWh_step, db_step = rnn_step_backward(dh[:, T-1, :], cache[T-1])
-    dWx = dWx + dWx_step
-    dWh = dWh + dWh_step
-    db  = db + db_step
+    dx[:, T-1, :], dh0, dWx_step, dWh_step, db_step = rnn_step_backward(dh[:, T-1, :], cache[T-1])
+    dWx = dWx_step
+    dWh = dWh_step
+    db  = db_step
     
-    for t in range(T - 2, 0, -1):
-        dx[:, t, :], dprev_h, dWx_step, dWh_step, db_step = rnn_step_backward(dprev_h + dh[:, t, :], cache[t])
-        #dh0 = dh0 + dh0_step
+    for t in range(T - 2, -1, -1):
+        dx[:, t, :], dh0, dWx_step, dWh_step, db_step = rnn_step_backward(dh0 + dh[:, t, :], cache[t])
         dWx = dWx + dWx_step
         dWh = dWh + dWh_step
-        db  = db + db_step   
-    
-    #first hidden state
-    dx[:, 0, :], dh0, dWx_step, dWh_step, db_step = rnn_step_backward(dprev_h, cache[0])
-    #dh0 = dh0 + dh0_step
-    dWx = dWx + dWx_step
-    dWh = dWh + dWh_step
-    db  = db + db_step    
-    #dh0 = dh0 / T#
-    #dWx = dWx / T
-    #dWh = dWh / T
-    #db = db / T
+        db  = db + db_step
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
